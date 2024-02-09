@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">TaskFTC</string>
+    <string name="description">description</string>
+    <string name="update">Update</string>
+</resources>
