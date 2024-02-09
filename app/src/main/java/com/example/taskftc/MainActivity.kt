@@ -1,51 +1,43 @@
 package com.example.taskftc
 
-import android.content.Context
-import android.net.ConnectivityManager
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.taskftc.data.DbManager
 import com.example.taskftc.data.GetURLData
+import com.example.taskftc.data.models.UserRead
 import com.example.taskftc.databinding.ActivityMainBinding
 import com.example.taskftc.domain.UserAdapter
+import com.example.taskftc.domain.useCase.CheckInternetUserCase
+import com.example.taskftc.domain.useCase.CleanTableUseCase
+import com.example.taskftc.domain.useCase.GetDataFromDBUseCase
 import com.google.android.material.snackbar.Snackbar
 
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mainClass: ActivityMainBinding
+    private val getDataFromDb = GetDataFromDBUseCase()
+    private val cleanTable = CleanTableUseCase()
+    private val isOnline = CheckInternetUserCase()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         mainClass = ActivityMainBinding.inflate(layoutInflater)
         setContentView(mainClass.root)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
 
-        val db = DbManager(this)
-        db.openDB()
-        val result = db.readData()
-        db.closeDB()
+        val result = getDataFromDb.execute(this)
         if(result.size == 0) {
-           getNewData(db)
+           getNewData()
         }else{
-            val recyclerview = mainClass.List
-            recyclerview.layoutManager = LinearLayoutManager(this)
-
-            val adapter = UserAdapter(result, this)
-            recyclerview.adapter = adapter
-
-            Snackbar.make(findViewById(android.R.id.content), "The data has been uploaded successfully", Snackbar.LENGTH_SHORT)
-                .show()
-
+            showUsers(result)
         }
         mainClass.topAppBar.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.update -> {
-                    db.openDB()
-                    db.cleanTable()
-                    db.closeDB()
+                    cleanTable.execute(this)
+                    getNewData()
 
-                    getNewData(db)
                     true
                 }
                 else -> false
@@ -53,47 +45,45 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getNewData(db: DbManager){
-        if (isOnline(this)) {
+    private fun getNewData() {
+        if (isOnline.execute(this)) {
+            val db = DbManager(this)
             @Suppress("DEPRECATION")
             GetURLData {
                 db.openDB()
                 it.forEach {
                     db.insertToDB(it)
                 }
-                val result = db.readData()
                 db.closeDB()
+                val result = getDataFromDb.execute(this)
+
                 if (result.size != 0) {
-                    val recyclerview = mainClass.List
-                    recyclerview.layoutManager = LinearLayoutManager(this)
-
-                    val adapter = UserAdapter(result, this)
-                    recyclerview.adapter = adapter
-
-                    Snackbar.make(
-                        findViewById(android.R.id.content),
-                        "The data has been uploaded successfully",
-                        Snackbar.LENGTH_SHORT)
-                        .show()
+                    showUsers(result)
                 } else {
                     Snackbar.make(
                         findViewById(android.R.id.content),
                         "Error. The data has not been uploaded",
-                        Snackbar.LENGTH_SHORT).show()
+                        Snackbar.LENGTH_SHORT
+                    ).show()
                 }
             }.execute(URL)
-        }else{
+        } else {
             Snackbar.make(
                 findViewById(android.R.id.content),
                 "There is no internet connection",
-                Snackbar.LENGTH_SHORT).show()
+                Snackbar.LENGTH_SHORT
+            ).show()
         }
     }
 
-    fun isOnline(context: Context): Boolean {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        @Suppress("DEPRECATION") val netInfo = cm.activeNetworkInfo
-        @Suppress("DEPRECATION")
-        return netInfo != null && netInfo.isConnectedOrConnecting
+    private fun showUsers(result: ArrayList<UserRead>){
+        val recyclerview = mainClass.List
+        recyclerview.layoutManager = LinearLayoutManager(this)
+
+        val adapter = UserAdapter(result, this)
+        recyclerview.adapter = adapter
+
+        Snackbar.make(findViewById(android.R.id.content), "The data has been uploaded successfully", Snackbar.LENGTH_SHORT)
+            .show()
     }
 }
